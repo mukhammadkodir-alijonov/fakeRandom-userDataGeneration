@@ -1,46 +1,79 @@
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using System.Diagnostics;
+using System.Text;
 using userDataGeneration.Models;
 using userDataGeneration.Services;
 
-namespace userDataGeneration.Controllers
+public class HomeController : Controller
 {
-    public class HomeController : Controller
+    private readonly ILogger<HomeController> _logger;
+    private List<Data> query;
+
+
+    public HomeController(ILogger<HomeController> logger)
     {
-        private readonly ILogger<HomeController> _logger;
-        private readonly UserService _userService;
-
-        public HomeController(ILogger<HomeController> logger, UserService userService)
-        {
-            _logger = logger;
-            _userService = userService;
-        }
-        public IActionResult Index(string region = "en", double errorRate = 0, int seed = 20, int page = 20)
-        {
-            // Validate the input parameters
-            if (string.IsNullOrEmpty(region)) return BadRequest("Region is required");
-            if (errorRate < 0 || errorRate > 10) return BadRequest("Error rate must be between 0 and 10");
-            if (seed < 0) return BadRequest("Seed must be non-negative");
-            if (page < 1) return BadRequest("Page must be positive");
-
-            // Combine the seed and the page number to get a unique seed for each page
-            var pageSeed = seed + page;
-
-            // Generate the user data for the given parameters
-            var users = _userService.GenerateUsers(region, errorRate, pageSeed);
-
-            return View(users);
-        }
-
-        public IActionResult Privacy()
-        {
-            return View();
-        }
-
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
-        {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-        }
+        _logger = logger;
     }
+
+    public IActionResult Index()
+    {
+        return View();
+    }
+
+    public IActionResult Privacy()
+    {
+        return View();
+    }
+
+    [HttpPost]
+    public IActionResult PartialTable(int itemsCount = 1, int page = 1, string locale = "ru", float errors = 0, int seed = 0)
+    {
+        DataFaker faker = new DataFaker(seed + page, locale, itemsCount, errors);
+        if (page == 1)
+            query = faker.Get(20);
+        if (page > 1)
+            query = faker.Get(10);
+        faker.ErrorsGenerator(ref query);
+        if (query.Count() == 0) return StatusCode(204);// 204 := "No Content"
+        return PartialView(query);
+    }
+
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult Error()
+    {
+        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+    }
+    public IActionResult ExportUsers()
+    {
+        var users = GetUsers(); // Replace this with your method to get users
+        var config = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .Build();
+
+        var usersSection = new List<IDictionary<string, string>>();
+        foreach (var user in users)
+        {
+            usersSection.Add(new Dictionary<string, string>
+        {
+            {"Id", user.Id.ToString()},
+            {"Name", user.Name},
+            {"Email", user.Address},
+            {"Phone", user.Telephone}
+        });
+        }
+
+        config.GetSection("Users").Value = JsonConvert.SerializeObject(usersSection);
+
+        return RedirectToAction("Index"); // Redirect to the index page after saving the users
+    }
+    private List<Data> GetUsers(int itemsCount = 20, string locale = "ru", float errors = 0, int seed = 0)
+    {
+        DataFaker faker = new DataFaker(seed, locale, itemsCount, errors);
+        var users = faker.Get(itemsCount);
+        faker.ErrorsGenerator(ref users);
+        return users;
+    }
+
 }

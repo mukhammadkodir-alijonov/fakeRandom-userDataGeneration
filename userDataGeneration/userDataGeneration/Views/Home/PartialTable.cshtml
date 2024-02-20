@@ -1,0 +1,22 @@
+﻿@model IEnumerable<Data>
+
+@foreach (var item in Model)
+{
+    <tr>
+        <td>
+            @Html.DisplayFor(model => item.Id)
+        </td>
+        <td>
+            @Html.DisplayFor(model => item.Number)
+        </td>
+        <td>
+            @Html.DisplayFor(model => item.Name)
+        </td>
+        <td>
+            @Html.DisplayFor(model => item.Address)
+        </td>
+        <td>
+            @Html.DisplayFor(model => item.Telephone)
+        </td>
+    </tr>
+}
